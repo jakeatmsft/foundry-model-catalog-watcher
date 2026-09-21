@@ -1,0 +1,6 @@
+# Baseline state — machine/tenant specific, don't commit unless you intend it as an audit trail
+model-watch-state.json
+
+# Local output
+*.csv
+*.log

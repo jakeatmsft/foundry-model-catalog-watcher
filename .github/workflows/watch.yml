@@ -1,0 +1,50 @@
+name: Watch Foundry model catalog
+
+# Daily is the right cadence — models don't land hourly.
+on:
+  schedule:
+    - cron: '0 13 * * *'
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # OIDC federated credential
+  contents: write   # commit the updated baseline back
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sign in to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Check for new models
+        shell: pwsh
+        run: |
+          ./Watch-FoundryModels.ps1 `
+            -Regions eastus2,swedencentral `
+            -Providers OpenAI,Anthropic `
+            -WebhookUrl "${{ secrets.ALERT_WEBHOOK_URL }}"
+
+      # Committing the baseline gives you a dated audit trail of when each
+      # model first appeared. Remove this step if you'd rather not.
+      - name: Commit updated baseline
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add model-watch-state.json
+          git diff --staged --quiet || git commit -m "Update model catalog baseline"
+          git push
+
+# Setup:
+#   1. Create an app registration with a federated credential for this repo.
+#   2. Grant it Reader on the subscription. That is the only permission needed.
+#   3. Add AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID and
+#      ALERT_WEBHOOK_URL as repository secrets.
+#   4. Remove model-watch-state.json from .gitignore if you want the baseline
+#      committed as an audit trail.
