@@ -16,6 +16,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
       - name: Sign in to Azure
         uses: azure/login@v2
         with:
@@ -24,12 +31,12 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Check for new models
-        shell: pwsh
-        run: |
-          ./Watch-FoundryModels.ps1 `
-            -Regions eastus2,swedencentral `
-            -Providers OpenAI,Anthropic `
-            -WebhookUrl "${{ secrets.ALERT_WEBHOOK_URL }}"
+        env:
+          REGIONS: ${{ vars.REGIONS || 'eastus2,swedencentral' }}
+          PROVIDERS: ${{ vars.PROVIDERS }}
+          DEPLOYMENT_TYPES: ${{ vars.DEPLOYMENT_TYPES }}
+          WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+        run: python watch_foundry_models.py --env-file .env.example
 
       # Committing the baseline gives you a dated audit trail of when each
       # model first appeared. Remove this step if you'd rather not.
@@ -37,7 +44,7 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add model-watch-state.json
+          git add -f model-watch-state.json
           git diff --staged --quiet || git commit -m "Update model catalog baseline"
           git push
 
@@ -46,5 +53,5 @@ jobs:
 #   2. Grant it Reader on the subscription. That is the only permission needed.
 #   3. Add AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID and
 #      ALERT_WEBHOOK_URL as repository secrets.
-#   4. Remove model-watch-state.json from .gitignore if you want the baseline
-#      committed as an audit trail.
+#   4. Set REGIONS, PROVIDERS, and DEPLOYMENT_TYPES as repository variables
+#      to customize the saved filters used by scheduled runs.

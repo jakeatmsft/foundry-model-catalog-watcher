@@ -4,3 +4,13 @@ model-watch-state.json
 # Local output
 *.csv
 *.log
+
+# Saved filters and alert secrets
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
